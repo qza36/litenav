@@ -1,0 +1,16 @@
+# Build
+cmake-build-*/
+build/
+
+# IDE
+.idea/
+*.iml
+
+# Git backups from sub-modules
+.git_backup/
+
+# OS
+.DS_Store
+
+# Claude
+.claude/
