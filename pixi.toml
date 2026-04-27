@@ -1,0 +1,46 @@
+[workspace]
+name = "litenav"
+description = "Litenav - ROS2-integrated A* path planning"
+authors = ["ZhiangQi <an9qi@yandex.com>"]
+channels = ["https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/", "https://prefix.dev/conda-forge"]
+platforms = ["osx-arm64"]
+
+[target.unix.activation.env]
+RMW_IMPLEMENTATION = "rmw_cyclonedds_cpp"
+
+[feature.build.target.unix.tasks]
+build = "colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+verify = { cmd = "bash -c 'source install/setup.bash && ros2 pkg list 2>&1 | grep litenav && ros2 launch litenav_ros2 bringup.launch.py --show-arguments'", depends-on = ["build"] }
+sim = { cmd = "bash -c 'source install/setup.bash && ros2 launch litenav_ros2 bringup.launch.py'", depends-on = ["build"] }
+
+[dependencies]
+compilers = "*"
+cmake = "*"
+pkg-config = "*"
+make = "*"
+ninja = "*"
+colcon-common-extensions = "*"
+yaml-cpp = ">=0.8.0"
+graphicsmagick = ">=1.3.45,<2"
+eigen = ">=3.4.0,<4"
+
+[environments]
+default = { features = ["jazzy", "build"] }
+jazzy = { features = ["jazzy", "build"] }
+
+[feature.jazzy]
+channels = ["https://prefix.dev/robostack-jazzy", "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/", "https://prefix.dev/conda-forge"]
+
+[feature.jazzy.dependencies]
+ros2-distro-mutex = { version = "0.14.*", build = "jazzy_*" }
+ros-jazzy-rclcpp = "*"
+ros-jazzy-nav-msgs = "*"
+ros-jazzy-geometry-msgs = "*"
+ros-jazzy-tf2-ros = "*"
+ros-jazzy-ament-cmake = "*"
+ros-jazzy-rmw-cyclonedds-cpp = "*"
+ros-jazzy-rviz2 = "*"
+ros-jazzy-ros2cli = "*"
+ros-jazzy-ros2launch = "*"
+ros-jazzy-ros2run = "*"
+ros-jazzy-ros2topic = "*"

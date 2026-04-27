@@ -14,3 +14,10 @@ build/
 
 # Claude
 .claude/
+
+# Pixi
+.pixi/
+
+# Colcon
+install/
+log/
