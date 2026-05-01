@@ -29,6 +29,18 @@ namespace app_module
         const std::string &window_title = "Planned Route");
 
     bool showDebugWindows(const GridMap &map, const planning_module::PlanResult &plan);
+
+    bool renderTrajectoryImage(
+        const GridMap &map,
+        const planning_module::PlanResult &plan,
+        const std::vector<Pose2D> &trajectory,
+        std::vector<uint8_t> &image);
+
+    bool showTrajectoryWindow(
+        const GridMap &map,
+        const planning_module::PlanResult &plan,
+        const std::vector<Pose2D> &trajectory,
+        const std::string &window_title = "PID Path Following");
 }
 
 #endif

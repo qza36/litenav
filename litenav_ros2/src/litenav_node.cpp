@@ -8,11 +8,13 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
 
 #include "map_io.hpp"
+#include "pid_path_follower.hpp"
 #include "planning.hpp"
 
 class LitenavNode : public rclcpp::Node {
@@ -24,6 +26,8 @@ public:
     latched.transient_local();
     map_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("/map", latched);
     plan_pub_ = create_publisher<nav_msgs::msg::Path>("/plan", 1);
+    traj_pub_ = create_publisher<nav_msgs::msg::Path>("/trajectory", 1);
+    marker_pub_ = create_publisher<visualization_msgs::msg::Marker>("/robot_marker", 1);
 
     using PoseWithCov = geometry_msgs::msg::PoseWithCovarianceStamped;
     using PoseStamped = geometry_msgs::msg::PoseStamped;
@@ -44,6 +48,17 @@ public:
           RCLCPP_INFO(get_logger(), "Goal set: (%.2f, %.2f)", goal_->x, goal_->y);
           planAndPublish();
         });
+
+    // PID parameters
+    pid_config_.kp = declare_parameter("pid_kp", 1.0);
+    pid_config_.ki = declare_parameter("pid_ki", 0.0);
+    pid_config_.kd = declare_parameter("pid_kd", 0.3);
+    pid_config_.max_linear_vel = declare_parameter("pid_max_linear_vel", 0.5);
+    pid_config_.max_angular_vel = declare_parameter("pid_max_angular_vel", 1.0);
+    pid_config_.dt = declare_parameter("pid_dt", 0.01);
+    pid_config_.goal_tolerance = declare_parameter("pid_goal_tolerance", 0.1);
+    pid_config_.lookahead_dist = declare_parameter("pid_lookahead_dist", 0.3);
+    follower_.setConfig(pid_config_);
 
     // Load map
     const std::string map_yaml = declare_parameter("map_yaml",
@@ -107,6 +122,14 @@ private:
   void planAndPublish() {
     if (!start_ || !goal_) return;
 
+    // Cancel previous animation immediately before overwriting state
+    if (anim_timer_) {
+      anim_timer_->cancel();
+      anim_timer_.reset();
+    }
+    trajectory_.clear();
+    traj_index_ = 0;
+
     planning_module::PlanResult result;
     if (!planner_.createPlan(*start_, *goal_, result)) {
       RCLCPP_WARN(get_logger(), "Planning failed — start/goal may be occupied or unreachable");
@@ -136,6 +159,92 @@ private:
     plan_pub_->publish(path);
     RCLCPP_INFO(get_logger(), "Plan published: %zu waypoints, cost=%.2f m",
                 result.world_path.size(), result.cost);
+
+    // PID path following
+    follower_.setPath(result.world_path);
+    std::vector<Pose2D> trajectory;
+    if (!follower_.followPath(*start_, trajectory)) {
+      RCLCPP_WARN(get_logger(), "PID path following failed");
+      return;
+    }
+
+    nav_msgs::msg::Path traj_msg;
+    traj_msg.header.frame_id = "map";
+    traj_msg.header.stamp = now();
+
+    for (const auto &pose : trajectory) {
+      geometry_msgs::msg::PoseStamped ps;
+      ps.header.frame_id = "map";
+      ps.header.stamp = traj_msg.header.stamp;
+      ps.pose.position.x = pose.x;
+      ps.pose.position.y = pose.y;
+      ps.pose.position.z = 0.0;
+      tf2::Quaternion q;
+      q.setRPY(0, 0, pose.yaw);
+      ps.pose.orientation.w = q.w();
+      ps.pose.orientation.x = q.x();
+      ps.pose.orientation.y = q.y();
+      ps.pose.orientation.z = q.z();
+      traj_msg.poses.push_back(ps);
+    }
+
+    traj_pub_->publish(traj_msg);
+    RCLCPP_INFO(get_logger(), "Trajectory published: %zu steps, end=(%.2f, %.2f)",
+                trajectory.size(), trajectory.back().x, trajectory.back().y);
+
+    // Start marker animation
+    trajectory_ = std::move(trajectory);
+    traj_index_ = 0;
+
+    // Publish initial marker immediately
+    publishMarker();
+
+    // Animate at ~100 Hz (10ms per step)
+    anim_timer_ = create_wall_timer(std::chrono::milliseconds(10),
+                                    [this]() { publishMarker(); });
+  }
+
+  void publishMarker() {
+    if (trajectory_.empty() || traj_index_ >= trajectory_.size()) {
+      if (anim_timer_) {
+        anim_timer_->cancel();
+      }
+      return;
+    }
+
+    const auto &pose = trajectory_[traj_index_];
+
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = "map";
+    marker.header.stamp = now();
+    marker.ns = "robot";
+    marker.id = 0;
+    marker.type = visualization_msgs::msg::Marker::CUBE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    marker.pose.position.x = pose.x;
+    marker.pose.position.y = pose.y;
+    marker.pose.position.z = 0.05;
+    tf2::Quaternion q;
+    q.setRPY(0, 0, pose.yaw);
+    marker.pose.orientation.w = q.w();
+    marker.pose.orientation.x = q.x();
+    marker.pose.orientation.y = q.y();
+    marker.pose.orientation.z = q.z();
+
+    marker.scale.x = 0.1;
+    marker.scale.y = 0.1;
+    marker.scale.z = 0.1;
+
+    marker.color.r = 0.0f;
+    marker.color.g = 0.0f;
+    marker.color.b = 0.0f;
+    marker.color.a = 1.0f;
+
+    marker.lifetime = rclcpp::Duration::max();
+
+    marker_pub_->publish(marker);
+    ++traj_index_;
   }
 
   static double yawFromQuat(const geometry_msgs::msg::Quaternion &q) {
@@ -147,16 +256,24 @@ private:
 
   std::shared_ptr<GridMap> map_;
   planning_module::AStarPlanner planner_;
+  control_module::PIDPathFollower follower_;
+  control_module::PIDConfig pid_config_;
   std::optional<Pose2D> start_;
   std::optional<Pose2D> goal_;
 
+  std::vector<Pose2D> trajectory_;
+  std::size_t traj_index_{0};
+
   rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr map_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr plan_pub_;
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr traj_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr start_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
 
   tf2_ros::StaticTransformBroadcaster tf_broadcaster_{this};
   rclcpp::TimerBase::SharedPtr map_timer_;
+  rclcpp::TimerBase::SharedPtr anim_timer_;
 };
 
 int main(int argc, char **argv) {

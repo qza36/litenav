@@ -20,6 +20,7 @@ endif()
 
 add_subdirectory(../map_module ${CMAKE_CURRENT_BINARY_DIR}/map_module_build)
 add_subdirectory(../plan_module ${CMAKE_CURRENT_BINARY_DIR}/plan_module_build)
+add_subdirectory(../control_module ${CMAKE_CURRENT_BINARY_DIR}/control_module_build)
 
 add_library(app_module
     src/navigation_app.cpp
@@ -32,6 +33,7 @@ target_include_directories(app_module PUBLIC
 
 target_link_libraries(app_module PUBLIC
     planning_module
+    control_module
 )
 
 target_link_libraries(app_module PRIVATE

@@ -10,6 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 # Pull in existing litenav modules (same pattern as app_module)
 if(NOT TARGET core_types)
@@ -21,6 +22,9 @@ endif()
 if(NOT TARGET planning_module)
   add_subdirectory(../plan_module ${CMAKE_CURRENT_BINARY_DIR}/plan_module_build)
 endif()
+if(NOT TARGET control_module)
+  add_subdirectory(../control_module ${CMAKE_CURRENT_BINARY_DIR}/control_module_build)
+endif()
 
 add_executable(litenav_node src/litenav_node.cpp)
 
@@ -29,11 +33,13 @@ ament_target_dependencies(litenav_node
   nav_msgs
   geometry_msgs
   tf2_ros
+  visualization_msgs
 )
 
 target_link_libraries(litenav_node
   map_module
   planning_module
+  control_module
 )
 
 install(TARGETS litenav_node DESTINATION lib/${PROJECT_NAME})

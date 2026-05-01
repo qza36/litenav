@@ -3,7 +3,7 @@
 <package format="3">
   <name>litenav_ros2</name>
   <version>0.1.0</version>
-  <description>ROS2 wrapper for litenav A* path planning with RViz2 visualization</description>
+  <description>ROS2 wrapper for litenav A* path planning with PID path following and RViz2 visualization</description>
   <maintainer email="an9qi@yandex.com">ZhiangQi</maintainer>
   <license>Apache-2.0</license>
 
@@ -13,6 +13,7 @@
   <depend>nav_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

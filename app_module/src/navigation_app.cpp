@@ -76,15 +76,43 @@ bool NavigationApp::planPath()
     return true;
 }
 
+bool NavigationApp::followPath()
+{
+    has_trajectory_ = false;
+    trajectory_.clear();
+    last_error_.clear();
+
+    if (!has_plan_) {
+        setError("no plan available");
+        return false;
+    }
+
+    if (!follower_.hasPath()) {
+        follower_.setPath(plan_.world_path);
+    }
+
+    if (!follower_.followPath(config_.start, trajectory_)) {
+        setError("failed to follow path");
+        return false;
+    }
+
+    has_trajectory_ = true;
+    return true;
+}
+
 bool NavigationApp::run()
 {
-    return loadMap() && planPath();
+    return loadMap() && planPath() && followPath();
 }
 
 bool NavigationApp::showDebugWindows() const
 {
     if (!map_ || !has_plan_) {
         return false;
+    }
+
+    if (has_trajectory_) {
+        return showTrajectoryWindow(*map_, plan_, trajectory_);
     }
 
     return app_module::showDebugWindows(*map_, plan_);
@@ -100,6 +128,11 @@ bool NavigationApp::hasPlan() const
     return has_plan_;
 }
 
+bool NavigationApp::hasTrajectory() const
+{
+    return has_trajectory_;
+}
+
 const GridMap * NavigationApp::map() const
 {
     return map_.get();
@@ -108,6 +141,11 @@ const GridMap * NavigationApp::map() const
 const planning_module::PlanResult * NavigationApp::plan() const
 {
     return has_plan_ ? &plan_ : nullptr;
+}
+
+const std::vector<Pose2D> * NavigationApp::trajectory() const
+{
+    return has_trajectory_ ? &trajectory_ : nullptr;
 }
 
 const std::string & NavigationApp::lastError() const

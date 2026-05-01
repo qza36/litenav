@@ -24,6 +24,18 @@ Visualization Manager:
       Line Style: Lines
       Line Width: 0.05
       Shaft Diameter: 0.02
+    - Class: rviz_default_plugins/Path
+      Name: Trajectory
+      Topic: /trajectory
+      Enabled: true
+      Color: 0; 200; 0
+      Line Style: Lines
+      Line Width: 0.03
+      Shaft Diameter: 0.01
+    - Class: rviz_default_plugins/Marker
+      Name: Robot
+      Topic: /robot_marker
+      Enabled: true
   Global Options:
     Fixed Frame: map
     Frame Rate: 30

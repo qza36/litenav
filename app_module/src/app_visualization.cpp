@@ -417,4 +417,57 @@ bool showDebugWindows(const GridMap &map, const planning_module::PlanResult &pla
     route_thread.join();
     return map_window_ok && route_window_ok;
 }
+
+bool renderTrajectoryImage(
+    const GridMap &map,
+    const planning_module::PlanResult &plan,
+    const std::vector<Pose2D> &trajectory,
+    std::vector<uint8_t> &image)
+{
+    if (!renderPlanImage(map, plan, image)) {
+        return false;
+    }
+
+    for (const auto &pose : trajectory) {
+        int gx = 0;
+        int gy = 0;
+        if (worldToGrid(map, pose.x, pose.y, gx, gy)) {
+            paintSquare(image, map, gx, gy, 1, {0, 200, 0});
+        }
+    }
+
+    if (!trajectory.empty()) {
+        int sx = 0;
+        int sy = 0;
+        if (worldToGrid(map, trajectory.front().x, trajectory.front().y, sx, sy)) {
+            paintSquare(image, map, sx, sy, 3, {0, 0, 255});
+        }
+        int ex = 0;
+        int ey = 0;
+        if (worldToGrid(map, trajectory.back().x, trajectory.back().y, ex, ey)) {
+            paintSquare(image, map, ex, ey, 3, {255, 165, 0});
+        }
+    }
+
+    return true;
+}
+
+bool showTrajectoryWindow(
+    const GridMap &map,
+    const planning_module::PlanResult &plan,
+    const std::vector<Pose2D> &trajectory,
+    const std::string &window_title)
+{
+    std::vector<uint8_t> image;
+    if (!renderTrajectoryImage(map, plan, trajectory, image)) {
+        return false;
+    }
+
+    Magick::Image magick_image;
+    if (!createMagickImage(image, map.width, map.height, window_title, magick_image)) {
+        return false;
+    }
+
+    return displayImageWindow(magick_image);
+}
 }  // namespace app_module

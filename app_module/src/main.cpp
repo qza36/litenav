@@ -7,7 +7,7 @@
 int main()
 {
     const app_module::NavigationAppConfig config{
-        "/home/arlo/CLionProjects/litenav_ws/map_module/maps/test.yaml",
+        "/Users/zhiangqi/CLionProjects/litenav/map_module/maps/test.yaml",
         {-1.05, -1.525, 0.0},
         {-0.975, 1.525, 0.0},
     };
@@ -32,6 +32,17 @@ int main()
                   << plan->world_path.front().y << ")" << std::endl;
         std::cout << "  goal: (" << plan->world_path.back().x << ", "
                   << plan->world_path.back().y << ")" << std::endl;
+
+        const auto *traj = app.trajectory();
+        if (traj == nullptr) {
+            std::cerr << "trajectory is unavailable" << std::endl;
+            return 1;
+        }
+
+        std::cout << "trajectory computed" << std::endl;
+        std::cout << "  steps: " << traj->size() << std::endl;
+        std::cout << "  end: (" << traj->back().x << ", "
+                  << traj->back().y << ")" << std::endl;
 
         std::cout << "opening debug windows..." << std::endl;
         if (!app.showDebugWindows()) {
